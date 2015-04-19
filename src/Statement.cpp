@@ -3,7 +3,7 @@
  * @ingroup SQLiteCpp
  * @brief   A prepared SQLite Statement is a compiled SQL query ready to be executed, pointing to a row of result.
  *
- * Copyright (c) 2012-2013 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2015 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -200,7 +200,7 @@ bool Statement::executeStep()
     }
     else
     {
-        throw SQLite::Exception("Statement need to be reseted");
+        throw SQLite::Exception("Statement needs to be reset");
     }
 
     return mbOk; // true only if one row is accessible by getColumn(N)
@@ -272,7 +272,7 @@ bool Statement::isColumnNull(const int aIndex) const
 }
 
 // Check if aRet equal SQLITE_OK, else throw a SQLite::Exception with the SQLite error message
-void Statement::check(const int aRet) const
+void Statement::check(const int aRet)
 {
     if (SQLITE_OK != aRet)
     {
@@ -337,11 +337,9 @@ Statement::Ptr::~Ptr() noexcept // nothrow
     --(*mpRefCount);
     if (0 == *mpRefCount)
     {
-        // If count reaches zero, finalize the sqlite3_stmt,
-        // as no Statement not Column objet use it anymore
-        int ret = sqlite3_finalize(mpStmt);
-        // Never throw an exception in a destructor
-        SQLITECPP_ASSERT(SQLITE_OK == ret, sqlite3_errmsg(mpSQLite));  // See SQLITECPP_ENABLE_ASSERT_HANDLER
+        // If count reaches zero, finalize the sqlite3_stmt, as no Statement nor Column objet use it anymore.
+        // No need to check the return code, as it is the same as the last statement evaluation.
+        sqlite3_finalize(mpStmt);
 
         // and delete the reference counter
         delete mpRefCount;

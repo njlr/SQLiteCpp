@@ -1,10 +1,25 @@
+if (BIICODE)
+
+  # biicode doesn't process files bigger than 5Mb
+  list(APPEND BII_LIB_SRC sqlite3/sqlite3.c)
+  # Include base block dir
+  ADD_BIICODE_TARGETS()
+
+  # Link target with dl for linux
+  if (UNIX)
+   TARGET_LINK_LIBRARIES(${BII_BLOCK_TARGET} INTERFACE pthread)
+   if(NOT APPLE)
+     TARGET_LINK_LIBRARIES(${BII_BLOCK_TARGET} INTERFACE dl)
+   endif()
+  endif()  
+else (BIICODE)
+
 # Main CMake file for compiling the library itself, examples and tests.
 #
-# Copyright (c) 2012-2014 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+# Copyright (c) 2012-2015 Sebastien Rombauts (sebastien.rombauts@gmail.com)
 #
 # Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
 # or copy at http://opensource.org/licenses/MIT) 
-
 cmake_minimum_required(VERSION 2.6)
 project(SQLiteCpp)
 
@@ -96,21 +111,34 @@ source_group(example1 FILES ${SQLITECPP_EXAMPLES})
 # list of doc files of the library
 set(SQLITECPP_DOC
  README.md
- WRAPPERS.md
  LICENSE.txt
+ CHANGELOG.txt
  TODO.txt
 )
 source_group(doc FILES ${SQLITECPP_DOC})
+
+# list of script files of the library
+set(SQLITECPP_SCRIPT
+ .travis.yml
+ appveyor.yml
+ biicode.conf
+ build.bat
+ build.sh
+ cpplint.py
+ Doxyfile
+ FindSQLiteCpp.cmake
+)
+source_group(scripts FILES ${SQLITECPP_SCRIPT})
 
 # All includes are relative to the "include" directory 
 include_directories("${PROJECT_SOURCE_DIR}/include")
 
 # add sources of the wrapper as a "SQLiteCpp" static library
-add_library(SQLiteCpp ${SQLITECPP_SRC} ${SQLITECPP_INC} ${SQLITECPP_DOC})
+add_library(SQLiteCpp ${SQLITECPP_SRC} ${SQLITECPP_INC} ${SQLITECPP_DOC} ${SQLITECPP_SCRIPT})
 
-if (UNIX AND (CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
+if (UNIX AND (CMAKE_COMPILER_IS_GNUCXX OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"))
     set_target_properties(SQLiteCpp PROPERTIES COMPILE_FLAGS "-fPIC")
-endif (UNIX AND (CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
+endif (UNIX AND (CMAKE_COMPILER_IS_GNUCXX OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"))
 
 
 # SQLite3 library (Windows only)
@@ -129,22 +157,30 @@ endif (WIN32)
 
 option(SQLITECPP_RUN_CPPLINT "Run cpplint.py tool for Google C++ StyleGuide." ON)
 if (SQLITECPP_RUN_CPPLINT)
-    # add a cpplint target to the "all" target
-    add_custom_target(SQLiteCpp_cpplint
-     ALL
-     COMMAND python ${PROJECT_SOURCE_DIR}/cpplint.py ${CPPLINT_ARG_OUTPUT} ${CPPLINT_ARG_VERBOSE} ${CPPLINT_ARG_LINELENGTH} ${SQLITECPP_SRC} ${SQLITECPP_INC}
-    )
+    find_package(PythonLibs)
+    if (PYTHONLIBS_FOUND)
+        # add a cpplint target to the "all" target
+        add_custom_target(SQLiteCpp_cpplint
+         ALL
+         COMMAND python ${PROJECT_SOURCE_DIR}/cpplint.py ${CPPLINT_ARG_OUTPUT} ${CPPLINT_ARG_VERBOSE} ${CPPLINT_ARG_LINELENGTH} ${SQLITECPP_SRC} ${SQLITECPP_INC}
+        )
+    endif (PYTHONLIBS_FOUND)
 else (SQLITECPP_RUN_CPPLINT)
     message(STATUS "SQLITECPP_RUN_CPPLINT OFF")
 endif (SQLITECPP_RUN_CPPLINT)
 
 option(SQLITECPP_RUN_CPPCHECK "Run cppcheck C++ static analysis tool." ON)
 if (SQLITECPP_RUN_CPPCHECK)
-    # add a cppcheck target to the "all" target
-    add_custom_target(SQLiteCpp_cppcheck
-     ALL
-     COMMAND cppcheck -j 4 cppcheck --enable=style --quiet ${CPPCHECK_ARG_TEMPLATE} ${PROJECT_SOURCE_DIR}/src
-    )
+    find_program(CPPCHECK_EXECUTABLE NAMES cppcheck)
+    if (CPPCHECK_EXECUTABLE)
+       # add a cppcheck target to the "all" target
+       add_custom_target(SQLiteCpp_cppcheck
+        ALL
+        COMMAND cppcheck -j 4 cppcheck --enable=style --quiet ${CPPCHECK_ARG_TEMPLATE} ${PROJECT_SOURCE_DIR}/src
+       )
+    else (CPPCHECK_EXECUTABLE)
+        message(STATUS "Could NOT find cppcheck")
+    endif (CPPCHECK_EXECUTABLE)
 else (SQLITECPP_RUN_CPPCHECK)
     message(STATUS "SQLITECPP_RUN_CPPCHECK OFF")
 endif (SQLITECPP_RUN_CPPCHECK)
@@ -159,14 +195,12 @@ if (SQLITECPP_RUN_DOXYGEN)
          COMMAND doxygen Doxyfile > ${DEV_NULL}
          WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         )
-    else (DOXYGEN_FOUND)
-        message(STATUS "Doxygen not found")
     endif (DOXYGEN_FOUND)
 else (SQLITECPP_RUN_DOXYGEN)
     message(STATUS "SQLITECPP_RUN_DOXYGEN OFF")
 endif (SQLITECPP_RUN_DOXYGEN)
 
-option(SQLITECPP_BUILD_EXAMPLES "Build examples." ON)
+option(SQLITECPP_BUILD_EXAMPLES "Build examples." OFF)
 if (SQLITECPP_BUILD_EXAMPLES)
     # add the basic example executable
     add_executable(SQLiteCpp_example1 ${SQLITECPP_EXAMPLES})
@@ -175,13 +209,13 @@ else(SQLITECPP_BUILD_EXAMPLES)
     message(STATUS "SQLITECPP_BUILD_EXAMPLES OFF")
 endif(SQLITECPP_BUILD_EXAMPLES)
 
-option(SQLITECPP_BUILD_TESTS "Build and run tests." ON)
+option(SQLITECPP_BUILD_TESTS "Build and run tests." OFF)
 if (SQLITECPP_BUILD_TESTS)
     # add the subdirectory containing the CMakeLists.txt for the gtest library
     if (NOT MSVC)
         add_definitions(-Wno-variadic-macros -Wno-long-long -Wno-conversion -Wno-switch-enum)
     endif (NOT MSVC)
-    
+
     add_subdirectory(googletest) 
     include_directories("${PROJECT_SOURCE_DIR}/googletest/include")
 
@@ -202,3 +236,5 @@ if (SQLITECPP_BUILD_TESTS)
 else (SQLITECPP_BUILD_TESTS)
     message(STATUS "SQLITECPP_BUILD_TESTS OFF")
 endif (SQLITECPP_BUILD_TESTS)
+
+endif (BIICODE)

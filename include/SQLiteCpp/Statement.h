@@ -3,7 +3,7 @@
  * @ingroup SQLiteCpp
  * @brief   A prepared SQLite Statement is a compiled SQL query ready to be executed, pointing to a row of result.
  *
- * Copyright (c) 2012-2013 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2015 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -50,7 +50,7 @@ public:
      * @brief Compile and register the SQL query for the provided SQLite Database Connection
      *
      * @param[in] aDatabase the SQLite Database Connection
-     * @param[in] apQuery   an UTF-8 encoded query string 
+     * @param[in] apQuery   an UTF-8 encoded query string
      *
      * Exception is thrown in case of error, then the Statement object is NOT constructed.
      */
@@ -269,7 +269,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
     /**
-     * @brief Return a copie of the column data specified by its index
+     * @brief Return a copy of the column data specified by its index
      *
      *  Can be used to access the data of the current row of result when applicable,
      * while the executeStep() method returns true.
@@ -326,8 +326,18 @@ public:
     {
         return mbDone;
     }
-    /// @brief Return UTF-8 encoded English language explanation of the most recent error.
-    inline const char* errmsg() const
+    /// @brief Return the numeric result code for the most recent failed API call (if any).
+    inline int getErrorCode() const noexcept // nothrow
+    {
+        return sqlite3_errcode(mStmtPtr);
+    }
+    /// @brief Return the extended numeric result code for the most recent failed API call (if any).
+    inline int getExtendedErrorCode() const noexcept // nothrow
+    {
+        return sqlite3_extended_errcode(mStmtPtr);
+    }
+    /// Return UTF-8 encoded English language explanation of the most recent failed API call (if any).
+    inline const char* errmsg() const noexcept // nothrow
     {
         return sqlite3_errmsg(mStmtPtr);
     }
@@ -368,10 +378,10 @@ public:
         /// @}
 
     private:
-        sqlite3*        mpSQLite;   //!< Pointer to SQLite Database Connection Handle
-        sqlite3_stmt*   mpStmt;     //!< Pointer to SQLite Statement Object
-        unsigned int*   mpRefCount; //!< Pointer to the heap allocated reference counter of the sqlite3_stmt
-                                    //!< (to share it with Column objects)
+        sqlite3*        mpSQLite;    //!< Pointer to SQLite Database Connection Handle
+        sqlite3_stmt*   mpStmt;      //!< Pointer to SQLite Statement Object
+        unsigned int*   mpRefCount;  //!< Pointer to the heap allocated reference counter of the sqlite3_stmt
+                                     //!< (to share it with Column objects)
     };
 
 private:
@@ -385,7 +395,7 @@ private:
      *
      * @param[in] SQLite return code to test against the SQLITE_OK expected value
      */
-    void check(const int aRet) const;
+    void check(const int aRet);
 
 private:
     std::string     mQuery;         //!< UTF-8 SQL Query
