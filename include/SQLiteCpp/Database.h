@@ -53,13 +53,17 @@ public:
      *
      * Exception is thrown in case of error, then the Database object is NOT constructed.
      *
-     * @param[in] apFilename    UTF-8 path/uri to the database file ("filename" sqlite3 parameter)
-     * @param[in] aFlags        SQLITE_OPEN_READONLY/SQLITE_OPEN_READWRITE/SQLITE_OPEN_CREATE...
-     * @param[in] apVfs         UTF-8 name of custom VFS to use, or nullptr for sqlite3 default
+     * @param[in] apFilename        UTF-8 path/uri to the database file ("filename" sqlite3 parameter)
+     * @param[in] aFlags            SQLITE_OPEN_READONLY/SQLITE_OPEN_READWRITE/SQLITE_OPEN_CREATE...
+     * @param[in] aBusyTimeoutMs    Amount of milliseconds to wait before returning SQLITE_BUSY (see setBusyTimeout())
+     * @param[in] apVfs             UTF-8 name of custom VFS to use, or nullptr for sqlite3 default
      *
      * @throw SQLite::Exception in case of error
      */
-    Database(const char* apFilename, const int aFlags = SQLITE_OPEN_READONLY, const char * apVfs = NULL);
+    Database(const char* apFilename,
+             const int   aFlags         = SQLITE_OPEN_READONLY,
+             const int   aBusyTimeoutMs = 0,
+             const char* apVfs          = NULL);
 
     /**
      * @brief Open the provided database UTF-8 filename.
@@ -71,13 +75,17 @@ public:
      *
      * Exception is thrown in case of error, then the Database object is NOT constructed.
      *
-     * @param[in] aFilename     UTF-8 path/uri to the database file ("filename" sqlite3 parameter)
-     * @param[in] aFlags        SQLITE_OPEN_READONLY/SQLITE_OPEN_READWRITE/SQLITE_OPEN_CREATE...
-     * @param[in] aVfs          UTF-8 name of custom VFS to use, or empty string for sqlite3 default
+     * @param[in] aFilename         UTF-8 path/uri to the database file ("filename" sqlite3 parameter)
+     * @param[in] aFlags            SQLITE_OPEN_READONLY/SQLITE_OPEN_READWRITE/SQLITE_OPEN_CREATE...
+     * @param[in] aBusyTimeoutMs    Amount of milliseconds to wait before returning SQLITE_BUSY (see setBusyTimeout())
+     * @param[in] aVfs              UTF-8 name of custom VFS to use, or empty string for sqlite3 default
      *
      * @throw SQLite::Exception in case of error
      */
-    Database(const std::string& aFilename, const int aFlags = SQLITE_OPEN_READONLY, const std::string& aVfs = "");
+    Database(const std::string& aFilename,
+             const int          aFlags          = SQLITE_OPEN_READONLY,
+             const int          aBusyTimeoutMs  = 0,
+             const std::string& aVfs            = "");
 
     /**
      * @brief Close the SQLite database connection.
@@ -88,6 +96,21 @@ public:
      * @warning assert in case of error
      */
     virtual ~Database() noexcept; // nothrow
+
+    /**
+     * @brief Set a busy handler that sleeps for a specified amount of time when a table is locked.
+     *
+     *  This is usefull in multithreaded program to handle case where a table is locked for writting by a thread.
+     * Any other thread cannot access the table and will receive a SQLITE_BUSY error:
+     * setting a timeout will wait and retry up to the time specified before returning this SQLITE_BUSY error.
+     *  Reading the value of timeout for current connection can be done with SQL query "PRAGMA busy_timeout;".
+     *  Default busy timeout is 0ms.
+     *
+     * @param[in] aBusyTimeoutMs    Amount of milliseconds to wait before returning SQLITE_BUSY
+     *
+     * @throw SQLite::Exception in case of error
+     */
+    void setBusyTimeout(const int aBusyTimeoutMs) noexcept; // nothrow
 
     /**
      * @brief Shortcut to execute one or multiple statements without results.
@@ -207,16 +230,6 @@ public:
     }
 
     /**
-     * @brief Set a busy handler that sleeps for a specified amount of time when a table is locked.
-     *
-     * @param[in] aTimeoutMs    Amount of milliseconds to wait before returning SQLITE_BUSY
-     */
-    inline int setBusyTimeout(int aTimeoutMs) noexcept // nothrow
-    {
-        return sqlite3_busy_timeout(mpSQLite, aTimeoutMs);
-    }
-
-    /**
      * @brief Get the rowid of the most recent successful INSERT into the database from the current connection.
      *
      *  Each entry in an SQLite table always has a unique 64-bit signed integer key called the rowid.
@@ -323,6 +336,25 @@ public:
                               apApp, apFunc, apStep, apFinal, apDestroy);
     }
 
+
+    /**
+     * @brief Load a module into the current sqlite database instance. 
+     *
+     *  This is the equivalent of the sqlite3_load_extension call, but additionally enables
+     *  module loading support prior to loading the requested module.
+     *
+     * @see http://www.sqlite.org/c3ref/load_extension.html
+     *
+     * @note UTF-8 text encoding assumed.
+     *
+     * @param[in] apExtensionName   Name of the shared library containing extension
+     * @param[in] apEntryPointName  Name of the entry point (NULL to let sqlite work it out)
+     *
+     * @throw SQLite::Exception in case of error
+     */
+    void loadExtension(const char* apExtensionName,
+         const char *apEntryPointName);
+
 private:
     /// @{ Database must be non-copyable
     Database(const Database&);
@@ -332,7 +364,13 @@ private:
     /**
      * @brief Check if aRet equal SQLITE_OK, else throw a SQLite::Exception with the SQLite error message
      */
-    void check(const int aRet) const;
+    inline void check(const int aRet) const
+    {
+        if (SQLITE_OK != aRet)
+        {
+            throw SQLite::Exception(sqlite3_errmsg(mpSQLite));
+        }
+    }
 
 private:
     sqlite3*    mpSQLite;   //!< Pointer to SQLite Database Connection Handle

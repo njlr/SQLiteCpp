@@ -38,6 +38,7 @@ Transaction::~Transaction() noexcept // nothrow
         catch (SQLite::Exception& e)
         {
             // Never throw an exception in a destructor
+            (void)e; // warning proof
             SQLITECPP_ASSERT(false, e.what());  // See SQLITECPP_ENABLE_ASSERT_HANDLER
         }
     }
@@ -53,7 +54,7 @@ void Transaction::commit()
     }
     else
     {
-        throw SQLite::Exception("Transaction already commited");
+        throw SQLite::Exception("Transaction already commited.");
     }
 }
 

@@ -2,9 +2,9 @@
  * @file  main.cpp
  * @brief A few short examples in a row.
  *
- *  Demonstrate how-to use the SQLite++ wrapper
+ *  Demonstrates how-to use the SQLite++ wrapper
  *
- * Copyright (c) 2012-2014 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2015 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -83,7 +83,11 @@ private:
 
 int main ()
 {
-    // Basic example (1/6) :
+    std::cout << "SQlite3 version " << SQLITE_VERSION << std::endl;
+    std::cout << "SQliteC++ version " << SQLITECPP_VERSION << std::endl;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Very basic first example (1/7) :
     try
     {
         // Open a database file in readonly mode
@@ -91,12 +95,28 @@ int main ()
         std::cout << "SQLite database file '" << db.getFilename().c_str() << "' opened successfully\n";
 
         // Test if the 'test' table exists
-        bool bExists = db.tableExists("test");
+        const bool bExists = db.tableExists("test");
         std::cout << "SQLite table 'test' exists=" << bExists << "\n";
 
         // Get a single value result with an easy to use shortcut
-        std::string value = db.execAndGet("SELECT value FROM test WHERE id=2");
+        const std::string value = db.execAndGet("SELECT value FROM test WHERE id=2");
         std::cout << "execAndGet=" << value.c_str() << std::endl;
+    }
+    catch (std::exception& e)
+    {
+        std::cout << "SQLite exception: " << e.what() << std::endl;
+        return EXIT_FAILURE; // unexpected error : exit the example program
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Simple select query - few variations (2/7) :
+    try
+    {
+        // Open a database file in readonly mode
+        SQLite::Database    db(filename_example_db3);  // SQLITE_OPEN_READONLY
+        std::cout << "SQLite database file '" << db.getFilename().c_str() << "' opened successfully\n";
+
+        ///// a) Loop to get values of column by index, using auto cast to variable type
 
         // Compile a SQL query, containing one parameter (index 1)
         SQLite::Statement   query(db, "SELECT id as test_id, value as test_val, weight as test_weight FROM test WHERE weight > ?");
@@ -108,34 +128,60 @@ int main ()
         // Loop to execute the query step by step, to get one a row of results at a time
         while (query.executeStep())
         {
-            // Demonstrate how to get some typed column value (and the equivalent explicit call)
-            int         id      = query.getColumn(0); // = query.getColumn(0).getInt()
-          //const char* pvalue  = query.getColumn(1); // = query.getColumn(1).getText()
-            std::string value2  = query.getColumn(1); // = query.getColumn(1).getText()
-            int         bytes   = query.getColumn(1).getBytes();
-            double      weight  = query.getColumn(2); // = query.getColumn(2).getInt()
-
-            static bool bFirst = true;
-            if (bFirst)
-            {
-                // Show how to get the aliased names of the result columns.
-                std::string name0 = query.getColumn(0).getName();
-                std::string name1 = query.getColumn(1).getName();
-                std::string name2 = query.getColumn(2).getName();
-                std::cout << "aliased result [\"" << name0.c_str() << "\", \"" << name1.c_str() << "\", \"" << name2.c_str() << "\"]\n";
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
-                // Show how to get origin names of the table columns from which theses result columns come from.
-                // Requires the SQLITE_ENABLE_COLUMN_METADATA preprocessor macro to be
-                // also defined at compile times of the SQLite library itself.
-                name0 = query.getColumn(0).getOriginName();
-                name1 = query.getColumn(1).getOriginName();
-                name2 = query.getColumn(2).getOriginName();
-                std::cout << "origin table 'test' [\"" << name0.c_str() << "\", \"" << name1.c_str() << "\", \"" << name2.c_str() << "\"]\n";
-#endif
-                bFirst = false;
-            }
-            std::cout << "row (" << id << ", \"" << value2.c_str() << "\" "  << bytes << " bytes, " << weight << ")\n";
+            // Demonstrates how to get some typed column value (and the equivalent explicit call)
+            const int         id     = query.getColumn(0); // = query.getColumn(0).getInt();
+          //const char*       pvalue = query.getColumn(1); // = query.getColumn(1).getText();
+            const std::string value  = query.getColumn(1); // = query.getColumn(1).getText();
+            const int         bytes  = query.getColumn(1).size(); // .getColumn(1).getBytes();
+            const double      weight = query.getColumn(2); // = query.getColumn(2).getInt();
+            std::cout << "row (" << id << ", \"" << value.c_str() << "\"(" << bytes << ") " << weight << ")\n";
         }
+
+        ///// b) Get aliased column names (and original column names if possible)
+
+        // Reset the query to use it again
+        query.reset();
+        std::cout << "SQLite statement '" << query.getQuery().c_str() << "' reseted (" << query.getColumnCount() << " columns in the result)\n";
+
+        // Show how to get the aliased names of the result columns.
+        const std::string name0 = query.getColumnName(0);
+        const std::string name1 = query.getColumnName(1);
+        const std::string name2 = query.getColumnName(2);
+        std::cout << "aliased result [\"" << name0.c_str() << "\", \"" << name1.c_str() << "\", \"" << name2.c_str() << "\"]\n";
+
+#ifdef SQLITE_ENABLE_COLUMN_METADATA
+        // Show how to get origin names of the table columns from which theses result columns come from.
+        // Requires the SQLITE_ENABLE_COLUMN_METADATA preprocessor macro to be
+        // also defined at compile times of the SQLite library itself.
+        const std::string oname0 = query.getColumnOriginName(0);
+        const std::string oname1 = query.getColumnOriginName(1);
+        const std::string oname2 = query.getColumnOriginName(2);
+        std::cout << "origin table 'test' [\"" << oname0.c_str() << "\", \"" << oname1.c_str() << "\", \"" << oname2.c_str() << "\"]\n";
+#endif
+        // Loop to execute the query step by step, to get one a row of results at a time
+        while (query.executeStep())
+        {
+            // Demonstrates that inserting column value in a std:ostream is natural
+            std::cout << "row (" << query.getColumn(0) << ", \"" << query.getColumn(1) << "\", " << query.getColumn(2) << ")\n";
+        }
+
+        ///// c) Get columns by name
+
+        // Reset the query to use it again
+        query.reset();
+        std::cout << "SQLite statement '" << query.getQuery().c_str() << "' reseted (" << query.getColumnCount() << " columns in the result)\n";
+
+        // Loop to execute the query step by step, to get one a row of results at a time
+        while (query.executeStep())
+        {
+            // Demonstrates how to get column value by aliased name (not the original table names, see above)
+            const int         id     = query.getColumn("test_id");
+            const std::string value  = query.getColumn("test_val");
+            const double      weight = query.getColumn("test_weight");
+            std::cout << "row (" << id << ", \"" << value.c_str() << "\" " << weight << ")\n";
+        }
+
+        ///// d) Uses explicit typed getters instead of auto cast operators
 
         // Reset the query to use it again
         query.reset();
@@ -143,11 +189,16 @@ int main ()
         // Bind the string value "6" to the first parameter of the SQL query
         query.bind(1, "6");
         std::cout << "binded with string value \"6\" :\n";
-
+        // Reuses variables: uses assignement operator in the loop instead of constructor with initialization
+        int         id = 0;
+        std::string value;
+        double      weight = 0.0;
         while (query.executeStep())
         {
-            // Demonstrate that inserting column value in a std:ostream is natural
-            std::cout << "row (" << query.getColumn(0) << ", \"" << query.getColumn(1) << "\", " << query.getColumn(2) << ")\n";
+            id        = query.getColumn(0).getInt();
+            value     = query.getColumn(1).getText();
+            weight    = query.getColumn(2).getInt();
+            std::cout << "row (" << id << ", \"" << value << "\", " << weight << ")\n";
         }
     }
     catch (std::exception& e)
@@ -157,13 +208,13 @@ int main ()
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // Object Oriented Basic example (2/6) :
+    // Object Oriented Basic example (3/7) :
     try
     {
         // Open the database and compile the query
         Example example;
 
-        // Demonstrate the way to use the same query with different parameter values
+        // Demonstrates the way to use the same query with different parameter values
         example.ListGreaterThan(8);
         example.ListGreaterThan(6);
         example.ListGreaterThan(2);
@@ -174,7 +225,7 @@ int main ()
         return EXIT_FAILURE; // unexpected error : exit the example program
     }
 
-    // The execAndGet wrapper example (3/6) :
+    // The execAndGet wrapper example (4/7) :
     try
     {
         // Open a database file in readonly mode
@@ -194,7 +245,7 @@ int main ()
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // Simple batch queries example (4/6) :
+    // Simple batch queries example (5/7) :
     try
     {
         // Open a database file in create/write mode
@@ -235,7 +286,7 @@ int main ()
     remove("test.db3");
 
     ////////////////////////////////////////////////////////////////////////////
-    // RAII transaction example (5/6) :
+    // RAII transaction example (6/7) :
     try
     {
         // Open a database file in create/write mode
@@ -303,7 +354,7 @@ int main ()
     remove("transaction.db3");
 
     ////////////////////////////////////////////////////////////////////////////
-    // Binary blob and in-memory database example (6/6) :
+    // Binary blob and in-memory database example (7/7) :
     try
     {
         // Open a database file in create/write mode

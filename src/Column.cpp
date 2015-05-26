@@ -3,7 +3,7 @@
  * @ingroup SQLiteCpp
  * @brief   Encapsulation of a Column in a row of the result pointed by the prepared SQLite::Statement.
  *
- * Copyright (c) 2012-2014 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2015 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -31,14 +31,14 @@ Column::~Column() noexcept // nothrow
 }
 
 // Return the named assigned to this result column (potentially aliased)
-const char * Column::getName() const noexcept // nothrow
+const char* Column::getName() const noexcept // nothrow
 {
     return sqlite3_column_name(mStmtPtr, mIndex);
 }
 
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
 // Return the name of the table column that is the origin of this result column
-const char * Column::getOriginName() const noexcept // nothrow
+const char* Column::getOriginName() const noexcept // nothrow
 {
     return sqlite3_column_origin_name(mStmtPtr, mIndex);
 }
