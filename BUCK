@@ -11,7 +11,7 @@ cxx_library(
 
 cxx_library(
   name = 'sqlitecpp',
-  header_namespace = '',
+  header_namespace = 'SQLiteCpp',
   exported_headers = subdir_glob([
     ('src', '*.h'),
   ]),
