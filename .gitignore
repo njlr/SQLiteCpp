@@ -22,3 +22,9 @@ CMakeFiles
 *.dir
 Testing
 Win32
+
+/buck-out/
+/.buckd/
+/buckaroo/
+.buckconfig.local
+BUCKAROO_DEPS
